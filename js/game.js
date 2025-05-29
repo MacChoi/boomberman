@@ -120,7 +120,7 @@ class Game {
                 // Modified logic for wider passages (3 tiles wide)
                 // Place walls on borders and at coordinates divisible by 4
                 if (x === 0 || x === this.mapSize - 1 || z === 0 || z === this.mapSize - 1 || 
-                    (x % 4 === 0 && z % 4 === 0)) {
+                    (x % 7 === 0 && z % 7 === 0)) {
                     // Wall with glowing effect
                     const geometry = new THREE.BoxGeometry(1, 1, 1);
                     const material = new THREE.MeshStandardMaterial({ 
@@ -1583,19 +1583,23 @@ class Game {
 
     checkObjectCollision(position, excludeObject = null) {
          const checkPosition2D = new THREE.Vector2(position.x, position.z);
-
+         const checkPosition3D = position; // 3D position for sphere collision
+         const checkRadius = this.collisionRadius; // Use player/enemy collision radius
+  
         // 다른 적과의 충돌 체크 (물리적 겹침 방지 목적)
         for (const enemy of this.enemies) {
             if (enemy !== excludeObject) {
                 const enemyPos2D = new THREE.Vector2(enemy.position.x, enemy.position.z);
-                if (checkPosition2D.distanceTo(enemyPos2D) < this.collisionRadius * 1.2) { // 적과의 물리적 겹침 방지 반경을 약간 줄여서 부드러운 이동 유도 (2 -> 1.2)
+                // Use a 3D distance check for better accuracy with potential height differences
+                const distanceToEnemy = checkPosition3D.distanceTo(enemy.position);
+                if (distanceToEnemy < checkRadius + this.collisionRadius * 0.6) { // Sum of radii for collision (adjust 0.6 multiplier as needed)
                     // 플레이어-적 충돌 시 게임 오버 처리는 handleKeyPress 또는 updateEnemies에서 수행
                     // checkObjectCollision은 물리적 겹침만 판단하며, 무적 상태는 여기서 고려하지 않음.
                     return true; // 적과 충돌
                 }
             }
         }
-
+  
         // 폭탄 모델과의 충돌 체크 (폭탄 모델 자체와 너무 가깝게 겹치는 것을 방지)
         for (const bomb of this.bombs) {
             if (bomb !== excludeObject) {
@@ -1603,24 +1607,28 @@ class Game {
                 // 캐릭터가 폭탄 모델 자체와 물리적으로 겹치는 것을 방지하기 위한 충돌
                 // 이동하려는 위치가 폭탄 모델의 충돌 반경 내에 있는지 체크
                 // 폭탄 설치 후 플레이어가 폭탄 타일에서 즉시 벗어나는 것은 허용되어야 하므로,
-                // 이 충돌 체크는 물리적 겹침 방지에 초점을 맞춤.
-                if (checkPosition2D.distanceTo(bombPos2D) < this.collisionRadius * 0.6) { // 폭탄과의 물리적 겹침 방지 반경을 약간 줄여서 지나가기 쉽게 조정 (0.8 -> 0.6)
+                // 이 충돌 체크는 물리적 겹침 방지에 초점을 맞춤. (이 함수는 물리적 충돌만 보고 타일 진입/이탈 로직은 handleKeyPress에서 판단)
+                // Use a 3D distance check
+                const distanceToBomb = checkPosition3D.distanceTo(bomb.position);
+                if (distanceToBomb < checkRadius + 0.4) { // Sum of radii (bomb radius approx 0.4) - adjust 0.4 if bomb size changes
                     // 이 충돌 체크는 이동하려는 위치에 폭탄 모델이 이미 있을 때 물리적 겹침을 막는 용도.
-                    // 플레이어가 폭탄 타일에서 벗어나는 경우는 이 충돌 체크와 무관하게 허용해야 함.
-                    // checkObjectCollision은 단순히 겹침 여부만 반환하고, 실제 이동 가능 여부는 handleKeyPress나 updateEnemies에서 판단.
+                    // 폭탄 타일 진입/이탈 로직은 handleKeyPress에서 별도로 처리됨.
+                    // checkObjectCollision은 단순히 물리적 겹침 여부만 반환.
                     return true; // 폭탄 모델과 충돌
                 }
             }
         }
-
-        // 플레이어 모델과의 충돌 체크 (물리적 겹침 방지 목적)
-        if (this.player !== excludeObject) {
+  
+        // 플레이어 모델과의 충돌 체크 (물리적 겹침 방지 목적) - 주로 적이 플레이어를 피할 때 사용
+        if (this.player !== excludeObject && this.player) { // Ensure player object exists
             const playerPos2D = new THREE.Vector2(this.player.position.x, this.player.position.z);
-            if (checkPosition2D.distanceTo(playerPos2D) < this.collisionRadius * 0.6) { // 플레이어와의 물리적 겹침 방지 반경을 약간 줄여서 부드러운 이동 유도 (0.8 -> 0.6)
+            // Use a 3D distance check
+            const distanceToPlayer = checkPosition3D.distanceTo(this.player.position);
+            if (distanceToPlayer < checkRadius + this.collisionRadius) { // Sum of radii
                 return true; // 플레이어와 물리적으로 겹침
             }
         }
-
+  
         return false; // 객체 충돌 없음
     }
 }
